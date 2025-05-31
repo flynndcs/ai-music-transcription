@@ -16,7 +16,7 @@ A Python library for converting piano scores to brass instrument arrangements. T
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/ai-music-transcription.git
+git clone https://github.com/flynndcs/ai-music-transcription.git
 cd ai-music-transcription
 
 # Install dependencies
@@ -161,5 +161,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 - 📖 Check the [documentation](docs/)
-- 🐛 Report bugs via [GitHub Issues](https://github.com/your-username/ai-music-transcription/issues)
-- 💡 Request features via [GitHub Discussions](https://github.com/your-username/ai-music-transcription/discussions)
+- 🐛 Report bugs via [GitHub Issues](https://github.com/flynndcs/ai-music-transcription/issues)
+- 💡 Request features via [GitHub Discussions](https://github.com/flynndcs/ai-music-transcription/discussions)

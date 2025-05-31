@@ -101,7 +101,7 @@
 
 Want to tackle any of these features? 
 
-1. Check if there's already an [issue](https://github.com/your-username/ai-music-transcription/issues) for the feature
+1. Check if there's already an [issue](https://github.com/flynndcs/ai-music-transcription/issues) for the feature
 2. If not, create a new issue to discuss the implementation approach
 3. Fork the repository and create a feature branch
 4. Implement the feature with tests
@@ -115,4 +115,4 @@ Feature priority is determined by:
 - **Resource availability**: Development time and expertise required
 - **Strategic value**: Alignment with project goals
 
-Vote on features or suggest new ones in our [GitHub Discussions](https://github.com/your-username/ai-music-transcription/discussions)!
+Vote on features or suggest new ones in our [GitHub Discussions](https://github.com/flynndcs/ai-music-transcription/discussions)!
