@@ -9,7 +9,7 @@ This project is designed to work seamlessly with Claude AI for development, debu
 When working on this project with Claude, use these settings for optimal results:
 
 ```
-Project Name: AI Music Transcription Tool
+Project Name: Transcriber
 Project Type: Python Development
 Focus Areas: Music Processing, MusicXML, Algorithm Development
 ```
@@ -105,8 +105,8 @@ Following the existing code style and patterns.
 When working with Claude, provide context about:
 
 ### Core Files
-- `src/ai_music_transcription/brass_arranger.py` - Main arrangement logic
-- `src/ai_music_transcription/__init__.py` - Package initialization
+- `src/transcriber/brass_arranger.py` - Main arrangement logic
+- `src/transcriber/__init__.py` - Package initialization
 - `examples/Example.xml` - Test input file
 
 ### Configuration Files
@@ -136,7 +136,7 @@ When Claude makes changes, verify:
 ```bash
 # Test basic functionality
 cd examples
-python -m ai_music_transcription.brass_arranger
+python -m transcriber.brass_arranger
 
 # Check output files
 ls -la Example_*.xml

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AI-Assisted Music Transcription Tool - Brass Arrangement Module
+Transcriber - Brass Arrangement Module
 Takes a piano MusicXML file and arranges it for trumpet and trombone.
 """
 

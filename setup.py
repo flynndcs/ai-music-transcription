@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Setup script for AI Music Transcription Tool."""
+"""Setup script for Transcriber."""
 
 from setuptools import setup, find_packages
 import os
@@ -17,9 +17,9 @@ def read_requirements():
 setup(
     name="ai-music-transcription",
     version="0.1.0",
-    author="AI Music Transcription Team",
+    author="Transcriber Team",
     author_email="contact@example.com",
-    description="AI-assisted tool for converting piano scores to brass arrangements",
+    description="Tool for converting piano scores to brass arrangements",
     long_description=read_readme(),
     long_description_content_type="text/markdown",
     url="https://github.com/flynndcs/ai-music-transcription",
@@ -59,7 +59,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "ai-music-transcription=ai_music_transcription.brass_arranger:main",
+            "transcriber=transcriber.brass_arranger:main",
         ],
     },
     include_package_data=True,

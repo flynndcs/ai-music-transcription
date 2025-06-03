@@ -1,4 +1,4 @@
-# AI-Assisted Music Transcription Tool
+# Transcriber
 
 A Python library for converting piano music to brass instrument arrangements. This tool accepts both MusicXML files and audio files (MP3, WAV, etc.) and automatically arranges them for trumpet and trombone with proper transposition, key signatures, and musical notation conventions.
 
@@ -31,7 +31,7 @@ pip install -e .
 ### Basic Usage
 
 ```python
-from ai_music_transcription import BrassArranger
+from transcriber import BrassArranger
 
 # Create arranger instance with MusicXML file
 arranger = BrassArranger("path/to/piano_score.xml")
@@ -53,7 +53,7 @@ print(f"  - Brass Duet: {duet_file}")
 ```bash
 # Run the example
 cd examples
-python -m ai_music_transcription.brass_arranger
+python -m transcriber.brass_arranger
 ```
 
 ## Example
@@ -114,7 +114,7 @@ The `examples/` directory contains sample files (`Example.xml` and `Example.mp3`
 
 ```
 ai-music-transcription/
-├── src/ai_music_transcription/     # Main package code
+├── src/transcriber/               # Main package code
 │   ├── __init__.py
 │   └── brass_arranger.py          # Core arrangement and transcription logic
 ├── examples/                      # Example input files
@@ -141,7 +141,7 @@ pip install -e ".[dev]"
 python -m pytest tests/
 
 # Run with coverage
-python -m pytest --cov=ai_music_transcription tests/
+python -m pytest --cov=transcriber tests/
 ```
 
 ### Contributing

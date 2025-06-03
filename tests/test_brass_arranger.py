@@ -10,7 +10,7 @@ import tempfile
 import os
 from unittest.mock import patch, MagicMock
 
-from ai_music_transcription import BrassArranger
+from transcriber import BrassArranger
 
 
 class TestBrassArranger(unittest.TestCase):
@@ -59,7 +59,7 @@ class TestBrassArranger(unittest.TestCase):
     
     def test_ranges_constants(self):
         """Test that range constants are reasonable."""
-        from ai_music_transcription.brass_arranger import Ranges
+        from transcriber.brass_arranger import Ranges
         
         # Test that ranges make musical sense
         self.assertLess(Ranges.TRUMPET_MIN, Ranges.TRUMPET_MAX)
@@ -70,7 +70,7 @@ class TestBrassArranger(unittest.TestCase):
     
     def test_transposition_constants(self):
         """Test that transposition intervals are correct."""
-        from ai_music_transcription.brass_arranger import Transposition
+        from transcriber.brass_arranger import Transposition
         
         # Test Bb trumpet transposition (should be major 2nd)
         interval = Transposition.BB_TRUMPET
