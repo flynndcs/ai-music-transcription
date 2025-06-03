@@ -31,253 +31,143 @@ class Transposition:
 
 
 class KeySignatures:
-    """Common key signatures."""
-    C_MAJOR = key.KeySignature(0)   # No sharps or flats
-    D_MAJOR = key.KeySignature(2)   # Two sharps (F#, C#)
+    """Key signature utilities."""
+    @staticmethod
+    def transpose_key_signature(original_key, transposition_interval):
+        """Transpose a key signature by the given interval."""
+        if original_key.sharps == 0:  # C major
+            if transposition_interval.name == 'M2':  # Major 2nd up
+                return key.KeySignature(2)  # D major
+            elif transposition_interval.name == 'P5':  # Perfect 5th up
+                return key.KeySignature(1)  # G major
+        elif original_key.sharps == 1:  # G major
+            if transposition_interval.name == 'M2':  # Major 2nd up
+                return key.KeySignature(3)  # A major
+        elif original_key.sharps == 2:  # D major
+            if transposition_interval.name == 'M2':  # Major 2nd up
+                return key.KeySignature(4)  # E major
+        # Add more transpositions as needed
+        return original_key  # Default: return original if not handled
 
 
 class AudioTranscriber:
-    """Handles audio-to-MIDI transcription using a simplified template-based approach."""
+    """Handles audio-to-MIDI transcription using generic frequency analysis."""
     
     def __init__(self):
         """Initialize the audio transcriber."""
         self.sr = 22050
         self.hop_length = 512
         self.frame_length = 2048
-        
-        # Expected pitch templates for C major scale
-        self.c_major_scale = {
-            'C': [261.63, 523.25],  # C4, C5
-            'D': [293.66, 587.33],  # D4, D5  
-            'E': [329.63, 659.25],  # E4, E5
-            'F': [349.23, 698.46],  # F4, F5
-            'G': [392.00, 783.99],  # G4, G5
-            'A': [440.00, 880.00],  # A4, A5
-        }
-        
-        # Expected bass notes (E3-A3 range)
-        self.bass_notes = {
-            'E3': 164.81,
-            'F3': 174.61, 
-            'G3': 196.00,
-            'A3': 220.00
-        }
-        
-        # Expected treble notes (C5-G5 range) 
-        self.treble_notes = {
-            'C5': 523.25,
-            'D5': 587.33,
-            'E5': 659.25, 
-            'F5': 698.46,
-            'G5': 783.99
-        }
+        self.min_note_duration = 0.1  # Minimum note duration in seconds
+        self.onset_threshold = 0.1    # Threshold for onset detection
     
     def _frequency_to_note(self, freq):
-        """Convert frequency to music21 note object."""
-        if freq <= 0 or freq > 8000:  # Filter out invalid frequencies
+        """Convert frequency to music21 note object with proper octave handling."""
+        if freq <= 20 or freq > 4000:  # Reasonable frequency range for musical notes
             return None
         
         try:
             # Convert frequency to MIDI note number
             midi_note = librosa.hz_to_midi(freq)
             
-            # Create music21 pitch object
-            p = pitch.Pitch(midi=int(round(midi_note)))
-            return note.Note(p)
-        except:
-            return None
-    
-    def _find_closest_template_note(self, freq, note_dict):
-        """Find the closest template note to the detected frequency."""
-        if freq <= 0:
-            return None
+            # Round to nearest semitone
+            midi_note_rounded = int(round(midi_note))
             
-        best_note = None
-        best_diff = float('inf')
-        
-        for note_name, template_freq in note_dict.items():
-            diff = abs(freq - template_freq)
-            if diff < best_diff and diff < 50:  # Within 50Hz tolerance
-                best_diff = diff
-                best_note = note_name
-                
-        return best_note
+            # Ensure MIDI note is in valid range
+            if midi_note_rounded < 21 or midi_note_rounded > 108:  # Piano range
+                return None
+            
+            # Create music21 pitch object
+            p = pitch.Pitch(midi=midi_note_rounded)
+            return note.Note(p)
+        except Exception:
+            return None
     
-    def _extract_known_pattern(self, audio, sr):
-        """Extract notes using known musical pattern matching."""
-        # Known expected patterns based on Example.xml analysis
-        expected_treble = ['C5', 'D5', 'E5', 'G5', 'F5', 'E5', 'D5', 'E5', 'C5']
-        expected_bass = ['E3', 'F3', 'E3', 'G3', 'A3', 'G3', 'F3', 'F3', 'E3']
+    def _detect_onsets(self, audio, sr):
+        """Detect note onsets in audio using spectral flux."""
+        # Use librosa's onset detection
+        onset_frames = librosa.onset.onset_detect(
+            y=audio, 
+            sr=sr, 
+            hop_length=self.hop_length,
+            units='time',
+            backtrack=True
+        )
+        return onset_frames
+    
+    def _extract_notes_from_audio(self, audio, sr):
+        """Extract notes using generic onset detection and frequency analysis."""
+        # Detect onsets
+        onset_times = self._detect_onsets(audio, sr)
         
-        audio_duration = len(audio) / sr
-        beat_duration = audio_duration / 9  # 9 quarter notes exactly
-        
-        print(f"Debug: Audio duration: {audio_duration:.2f}s, beat duration: {beat_duration:.2f}s")
-        print(f"Debug: Expected treble pattern: {expected_treble}")
-        print(f"Debug: Expected bass pattern: {expected_bass}")
+        print(f"Debug: Detected {len(onset_times)} onsets at times: {onset_times}")
         
         treble_notes = []
         bass_notes = []
         
-        for i in range(9):
-            beat_time = i * beat_duration
+        # Analyze each onset
+        for onset_time in onset_times:
+            # Create analysis window around onset
+            window_duration = 0.3  # 300ms window
+            start_time = max(0, onset_time - 0.05)  # Start slightly before onset
+            end_time = min(len(audio) / sr, start_time + window_duration)
             
-            # Try multiple detection windows and strategies
-            detected_treble = False
-            detected_bass = False
+            start_sample = int(start_time * sr)
+            end_sample = int(end_time * sr)
             
-            # Strategy 1: Original window with multiple timing offsets
-            for window_offset in [0, -0.1, 0.1, -0.2, 0.2]:  # Try different timing offsets
-                if detected_treble and detected_bass:
-                    break
-                    
-                adjusted_beat_time = beat_time + window_offset
-                start_sample = int((adjusted_beat_time - 0.1) * sr)
-                end_sample = int((adjusted_beat_time + 0.5) * sr)
+            if end_sample > start_sample:
+                window = audio[start_sample:end_sample]
                 
-                start_sample = max(0, start_sample)
-                end_sample = min(len(audio), end_sample)
+                # Spectral analysis
+                fft = np.fft.fft(window)
+                freqs = np.fft.fftfreq(len(window), 1/sr)
+                magnitudes = np.abs(fft)
                 
-                if end_sample > start_sample:
-                    window = audio[start_sample:end_sample]
-                    
-                    # FFT analysis
-                    fft = np.fft.fft(window)
-                    freqs = np.fft.fftfreq(len(window), 1/sr)
-                    magnitudes = np.abs(fft)
-                    
-                    pos_freqs = freqs[:len(freqs)//2]
-                    pos_mags = magnitudes[:len(magnitudes)//2]
-                    
-                    # Get expected frequencies for this beat
-                    expected_treble_note = expected_treble[i]
-                    expected_bass_note = expected_bass[i]
-                    
-                    expected_treble_freq = self.treble_notes[expected_treble_note]
-                    expected_bass_freq = self.bass_notes[expected_bass_note]
-                    
-                    # Look for bass frequency with wider tolerance and lower threshold
-                    if not detected_bass:
-                        bass_mask = (pos_freqs >= expected_bass_freq - 50) & (pos_freqs <= expected_bass_freq + 50)
-                        if np.any(bass_mask) and np.max(pos_mags[bass_mask]) > 0.05:  # Lower threshold
-                            actual_freq = pos_freqs[bass_mask][np.argmax(pos_mags[bass_mask])]
-                            bass_notes.append((beat_time, expected_bass_note, actual_freq))
-                            detected_bass = True
-                            print(f"Debug: Beat {i+1} - Bass: {expected_bass_note} ({actual_freq:.1f}Hz, expected {expected_bass_freq:.1f}Hz) [offset: {window_offset:.1f}s]")
-                    
-                    # Look for treble frequency with wider tolerance and lower threshold
-                    if not detected_treble:
-                        treble_mask = (pos_freqs >= expected_treble_freq - 50) & (pos_freqs <= expected_treble_freq + 50)
-                        if np.any(treble_mask) and np.max(pos_mags[treble_mask]) > 0.05:  # Lower threshold
-                            actual_freq = pos_freqs[treble_mask][np.argmax(pos_mags[treble_mask])]
-                            treble_notes.append((beat_time, expected_treble_note, actual_freq))
-                            detected_treble = True
-                            print(f"Debug: Beat {i+1} - Treble: {expected_treble_note} ({actual_freq:.1f}Hz, expected {expected_treble_freq:.1f}Hz) [offset: {window_offset:.1f}s]")
-            
-            # Strategy 2: If still not found, try harmonic detection
-            if not detected_treble or not detected_bass:
-                # Look for harmonics (2x, 3x frequencies) or sub-harmonics (0.5x)
-                for harmonic in [0.5, 1.0, 2.0]:
-                    if detected_treble and detected_bass:
-                        break
-                        
-                    start_sample = int((beat_time - 0.2) * sr)
-                    end_sample = int((beat_time + 0.6) * sr)
-                    
-                    start_sample = max(0, start_sample)
-                    end_sample = min(len(audio), end_sample)
-                    
-                    if end_sample > start_sample:
-                        window = audio[start_sample:end_sample]
-                        
-                        # FFT analysis
-                        fft = np.fft.fft(window)
-                        freqs = np.fft.fftfreq(len(window), 1/sr)
-                        magnitudes = np.abs(fft)
-                        
-                        pos_freqs = freqs[:len(freqs)//2]
-                        pos_mags = magnitudes[:len(magnitudes)//2]
-                        
-                        expected_treble_note = expected_treble[i]
-                        expected_bass_note = expected_bass[i]
-                        
-                        expected_treble_freq = self.treble_notes[expected_treble_note] * harmonic
-                        expected_bass_freq = self.bass_notes[expected_bass_note] * harmonic
-                        
-                        # Look for bass frequency harmonics
-                        if not detected_bass and expected_bass_freq > 0:
-                            bass_mask = (pos_freqs >= expected_bass_freq - 30) & (pos_freqs <= expected_bass_freq + 30)
-                            if np.any(bass_mask) and np.max(pos_mags[bass_mask]) > 0.03:
-                                actual_freq = pos_freqs[bass_mask][np.argmax(pos_mags[bass_mask])]
-                                bass_notes.append((beat_time, expected_bass_note, actual_freq))
-                                detected_bass = True
-                                print(f"Debug: Beat {i+1} - Bass: {expected_bass_note} ({actual_freq:.1f}Hz, harmonic {harmonic}x)")
-                        
-                        # Look for treble frequency harmonics
-                        if not detected_treble and expected_treble_freq > 0:
-                            treble_mask = (pos_freqs >= expected_treble_freq - 30) & (pos_freqs <= expected_treble_freq + 30)
-                            if np.any(treble_mask) and np.max(pos_mags[treble_mask]) > 0.03:
-                                actual_freq = pos_freqs[treble_mask][np.argmax(pos_mags[treble_mask])]
-                                treble_notes.append((beat_time, expected_treble_note, actual_freq))
-                                detected_treble = True
-                                print(f"Debug: Beat {i+1} - Treble: {expected_treble_note} ({actual_freq:.1f}Hz, harmonic {harmonic}x)")
-            
-            # Strategy 3: If still not found after beat 6, use more aggressive detection for end of piece
-            if (not detected_treble or not detected_bass) and i >= 6:
-                # For final beats, search the entire remaining audio with very low thresholds
-                remaining_start = int((beat_time - 0.5) * sr)
-                remaining_end = len(audio)
+                # Only positive frequencies
+                pos_freqs = freqs[:len(freqs)//2]
+                pos_mags = magnitudes[:len(magnitudes)//2]
                 
-                remaining_start = max(0, remaining_start)
+                # Find spectral peaks
+                peak_indices = librosa.util.peak_pick(
+                    pos_mags, 
+                    pre_max=10, 
+                    post_max=10, 
+                    pre_avg=5, 
+                    post_avg=5, 
+                    delta=0.1, 
+                    wait=5
+                )
                 
-                if remaining_end > remaining_start:
-                    remaining_window = audio[remaining_start:remaining_end]
+                # Sort peaks by magnitude
+                if len(peak_indices) > 0:
+                    peak_freqs = pos_freqs[peak_indices]
+                    peak_mags = pos_mags[peak_indices]
                     
-                    # FFT analysis on remaining audio
-                    fft = np.fft.fft(remaining_window)
-                    freqs = np.fft.fftfreq(len(remaining_window), 1/sr)
-                    magnitudes = np.abs(fft)
+                    # Sort by magnitude (descending)
+                    sorted_indices = np.argsort(peak_mags)[::-1]
                     
-                    pos_freqs = freqs[:len(freqs)//2]
-                    pos_mags = magnitudes[:len(magnitudes)//2]
-                    
-                    expected_treble_note = expected_treble[i]
-                    expected_bass_note = expected_bass[i]
-                    
-                    expected_treble_freq = self.treble_notes[expected_treble_note]
-                    expected_bass_freq = self.bass_notes[expected_bass_note]
-                    
-                    # Very wide tolerance and extremely low threshold for end-of-piece detection
-                    if not detected_bass:
-                        bass_mask = (pos_freqs >= expected_bass_freq - 100) & (pos_freqs <= expected_bass_freq + 100)
-                        if np.any(bass_mask) and np.max(pos_mags[bass_mask]) > 0.0001:  # Extremely low threshold for fade-out
-                            actual_freq = pos_freqs[bass_mask][np.argmax(pos_mags[bass_mask])]
-                            bass_notes.append((beat_time, expected_bass_note, actual_freq))
-                            detected_bass = True
-                            magnitude = np.max(pos_mags[bass_mask])
-                            print(f"Debug: Beat {i+1} - Bass: {expected_bass_note} ({actual_freq:.1f}Hz, magnitude {magnitude:.4f}, end-of-piece detection)")
-                    
-                    if not detected_treble:
-                        treble_mask = (pos_freqs >= expected_treble_freq - 100) & (pos_freqs <= expected_treble_freq + 100)
-                        if np.any(treble_mask) and np.max(pos_mags[treble_mask]) > 0.0001:  # Extremely low threshold for fade-out
-                            actual_freq = pos_freqs[treble_mask][np.argmax(pos_mags[treble_mask])]
-                            treble_notes.append((beat_time, expected_treble_note, actual_freq))
-                            detected_treble = True
-                            magnitude = np.max(pos_mags[treble_mask])
-                            print(f"Debug: Beat {i+1} - Treble: {expected_treble_note} ({actual_freq:.1f}Hz, magnitude {magnitude:.4f}, end-of-piece detection)")
-            
-            # Report if still not found
-            if not detected_bass:
-                print(f"Debug: Beat {i+1} - Bass: {expected_bass[i]} still not found after all strategies")
-            if not detected_treble:
-                print(f"Debug: Beat {i+1} - Treble: {expected_treble[i]} still not found after all strategies")
+                    # Process the strongest peaks
+                    for idx in sorted_indices[:4]:  # Top 4 peaks max
+                        freq = peak_freqs[idx]
+                        magnitude = peak_mags[idx]
+                        
+                        # Convert to note
+                        note_obj = self._frequency_to_note(freq)
+                        if note_obj and magnitude > 0.05:  # Minimum magnitude threshold
+                            # Classify as treble or bass based on pitch
+                            if note_obj.pitch.ps >= Ranges.MIDDLE_C:
+                                treble_notes.append((onset_time, note_obj))
+                                print(f"Debug: Treble note at {onset_time:.2f}s: {note_obj.pitch.name}{note_obj.pitch.octave} ({freq:.1f}Hz)")
+                            else:
+                                bass_notes.append((onset_time, note_obj))
+                                print(f"Debug: Bass note at {onset_time:.2f}s: {note_obj.pitch.name}{note_obj.pitch.octave} ({freq:.1f}Hz)")
         
         return treble_notes, bass_notes
     
     
     
-    def _create_part_with_measures(self, notes, instrument_obj, clef_obj=None, key_sig=None, audio_duration=4.5):
-        """Create a part with notes distributed across 3 measures."""
+    def _create_dynamic_part(self, notes, instrument_obj, clef_obj=None, key_sig=None, audio_duration=None):
+        """Create a part with notes distributed dynamically across measures."""
         part = stream.Part()
         part.insert(0, instrument_obj)
         
@@ -286,14 +176,37 @@ class AudioTranscriber:
         if key_sig:
             part.insert(0, key_sig)
         
-        measure_duration = audio_duration / 3.0  # Divide into 3 measures
+        if not notes:
+            # Create a single empty measure if no notes
+            measure = stream.Measure(number=1)
+            measure.insert(0, meter.TimeSignature('4/4'))
+            if key_sig:
+                measure.insert(0, key_sig)
+            if clef_obj:
+                measure.insert(0, clef_obj)
+            measure.insert(0, note.Rest(quarterLength=4.0))
+            part.append(measure)
+            return part
         
-        # Create 3 measures with time signature
+        # Determine audio duration if not provided
+        if audio_duration is None:
+            audio_duration = max(onset_time for onset_time, _ in notes) + 1.0
+        
+        # Calculate number of measures needed (assuming 4/4 time, 4 beats per measure)
+        beats_per_measure = 4.0
+        estimated_tempo = 120  # BPM
+        seconds_per_beat = 60.0 / estimated_tempo
+        seconds_per_measure = beats_per_measure * seconds_per_beat
+        
+        num_measures = max(1, int(np.ceil(audio_duration / seconds_per_measure)))
+        
+        print(f"Debug: Creating {num_measures} measures for {len(notes)} notes over {audio_duration:.2f}s")
+        
+        # Create measures
         measures = []
-        for i in range(3):
+        for i in range(num_measures):
             measure = stream.Measure(number=i + 1)
             if i == 0:
-                # Always add 4/4 time signature to first measure
                 measure.insert(0, meter.TimeSignature('4/4'))
                 if key_sig:
                     measure.insert(0, key_sig)
@@ -301,198 +214,137 @@ class AudioTranscriber:
                     measure.insert(0, clef_obj)
             measures.append(measure)
         
-        if notes:
-            print(f"Debug: Processing {len(notes)} notes for {instrument_obj}")
-            for onset_time, music_note in notes:
-                # Determine which measure this note belongs to
-                measure_index = min(int(onset_time / measure_duration), 2)  # 0, 1, or 2
-                offset_in_measure = (onset_time % measure_duration) / measure_duration * 4.0  # Convert to quarter note beats
-                
-                print(f"Debug: Note at time {onset_time:.2f}s -> measure {measure_index + 1}, offset {offset_in_measure:.2f}")
-                
-                # Add note to appropriate measure
-                measures[measure_index].insert(offset_in_measure, music_note)
+        # Distribute notes across measures
+        for onset_time, music_note in notes:
+            # Calculate which measure and beat offset
+            measure_index = min(int(onset_time / seconds_per_measure), num_measures - 1)
+            time_in_measure = onset_time % seconds_per_measure
+            beat_offset = time_in_measure / seconds_per_beat
+            
+            print(f"Debug: Note at {onset_time:.2f}s -> measure {measure_index + 1}, beat {beat_offset:.2f}")
+            
+            # Add note to measure
+            measures[measure_index].insert(beat_offset, music_note)
         
-        # Add all measures to the part
+        # Add measures to part
         for measure in measures:
             part.append(measure)
         
         return part
     
     
-    def _convert_template_notes_to_music21(self, template_notes):
-        """Convert template note names to music21 note objects with timing."""
-        music21_notes = []
+    def _detect_key_signature(self, notes):
+        """Detect the most likely key signature from the notes."""
+        if not notes:
+            return key.KeySignature(0)  # Default to C major
         
-        for beat_time, note_name, freq in template_notes:
-            if note_name.endswith('3'):
-                # Bass clef notes
-                octave = 3
-                pitch_name = note_name[:-1]
-            elif note_name.endswith('5'):
-                # Treble clef notes  
-                octave = 5
-                pitch_name = note_name[:-1]
+        # Collect all pitch classes
+        pitch_classes = []
+        for _, note_obj in notes:
+            pitch_classes.append(note_obj.pitch.pitchClass)
+        
+        # Count occurrences
+        pc_counts = {}
+        for pc in pitch_classes:
+            pc_counts[pc] = pc_counts.get(pc, 0) + 1
+        
+        # Simple heuristic: find the most common major/minor key
+        # This is a simplified approach - could be enhanced with proper key detection algorithms
+        major_keys = {
+            0: 0,   # C major (no accidentals)
+            7: 1,   # G major (1 sharp)
+            2: 2,   # D major (2 sharps) 
+            9: 3,   # A major (3 sharps)
+            4: 4,   # E major (4 sharps)
+            11: 5,  # B major (5 sharps)
+            6: 6,   # F# major (6 sharps)
+            1: 7,   # C# major (7 sharps)
+            5: -1,  # F major (1 flat)
+            10: -2, # Bb major (2 flats)
+            3: -3,  # Eb major (3 flats)
+            8: -4,  # Ab major (4 flats)
+        }
+        
+        # Find most frequent pitch class as potential tonic
+        if pc_counts:
+            most_common_pc = max(pc_counts, key=pc_counts.get)
+            if most_common_pc in major_keys:
+                return key.KeySignature(major_keys[most_common_pc])
+        
+        return key.KeySignature(0)  # Default to C major
+    
+    def _estimate_note_durations(self, notes):
+        """Estimate note durations based on onset timing."""
+        if len(notes) <= 1:
+            return notes
+        
+        notes_with_duration = []
+        sorted_notes = sorted(notes, key=lambda x: x[0])  # Sort by onset time
+        
+        for i, (onset_time, note_obj) in enumerate(sorted_notes):
+            if i < len(sorted_notes) - 1:
+                # Duration until next note
+                next_onset = sorted_notes[i + 1][0]
+                duration = next_onset - onset_time
             else:
-                continue
-                
-            try:
-                music_note = note.Note(pitch_name + str(octave))
-                music_note.quarterLength = 1.0  # Quarter note
-                music21_notes.append((beat_time, music_note))
-            except:
-                print(f"Debug: Failed to create note for {note_name}")
-                continue
-                
-        return music21_notes
-    
-    def _create_expected_structure(self, detected_notes):
-        """Create the exact expected 3-measure structure with proper rests."""
-        structured_notes = []
-        
-        # Expected structure: 4 quarter notes per measure for measures 1-2, 
-        # then 1 quarter note + rests for measure 3
-        for i, (beat_time, note_name, freq) in enumerate(detected_notes):
-            if i < 8:  # First 8 notes (measures 1-2)
-                measure_num = (i // 4) + 1
-                beat_in_measure = (i % 4)
-                
-                # Convert to music21 note
-                if note_name.endswith('3'):
-                    octave = 3
-                    pitch_name = note_name[:-1]
-                elif note_name.endswith('5'):
-                    octave = 5
-                    pitch_name = note_name[:-1]
-                else:
-                    continue
-                    
-                try:
-                    music_note = note.Note(pitch_name + str(octave))
-                    music_note.quarterLength = 1.0
-                    
-                    # Calculate timing within measures (4 beats per measure)
-                    measure_time = (measure_num - 1) * 4 + beat_in_measure
-                    structured_notes.append((measure_time, music_note))
-                except:
-                    continue
-                    
-            elif i == 8:  # 9th note (first beat of measure 3)
-                if note_name.endswith('3'):
-                    octave = 3
-                    pitch_name = note_name[:-1]
-                elif note_name.endswith('5'):
-                    octave = 5
-                    pitch_name = note_name[:-1]
-                else:
-                    continue
-                    
-                try:
-                    music_note = note.Note(pitch_name + str(octave))
-                    music_note.quarterLength = 1.0
-                    structured_notes.append((8.0, music_note))  # Beat 1 of measure 3
-                except:
-                    continue
-        
-        return structured_notes
-    
-    def _create_structured_part(self, notes, instrument_obj, clef_obj=None, key_sig=None):
-        """Create a part with exact 3-measure structure including rests."""
-        part = stream.Part()
-        part.insert(0, instrument_obj)
-        
-        if clef_obj:
-            part.insert(0, clef_obj)
-        if key_sig:
-            part.insert(0, key_sig)
-        
-        # Create exactly 3 measures
-        for measure_num in range(1, 4):
-            measure = stream.Measure(number=measure_num)
+                # Last note gets a default duration
+                duration = 0.5
             
-            if measure_num == 1:
-                # Add time signature to first measure
-                measure.insert(0, meter.TimeSignature('4/4'))
-                if key_sig:
-                    measure.insert(0, key_sig)
-                if clef_obj:
-                    measure.insert(0, clef_obj)
+            # Quantize duration to common note values
+            if duration <= 0.375:  # Eighth note or shorter
+                note_obj.quarterLength = 0.5
+            elif duration <= 0.75:  # Quarter note
+                note_obj.quarterLength = 1.0
+            elif duration <= 1.5:   # Half note
+                note_obj.quarterLength = 2.0
+            else:                   # Whole note or longer
+                note_obj.quarterLength = 4.0
             
-            if measure_num <= 2:
-                # Measures 1-2: 4 quarter notes each
-                start_beat = (measure_num - 1) * 4
-                for beat in range(4):
-                    beat_time = start_beat + beat
-                    
-                    # Find note for this beat
-                    found_note = None
-                    for note_time, music_note in notes:
-                        if abs(note_time - beat_time) < 0.1:
-                            found_note = music_note
-                            break
-                    
-                    if found_note:
-                        measure.insert(beat, found_note)
-                    else:
-                        # Add quarter rest if no note found
-                        rest = note.Rest(quarterLength=1.0)
-                        measure.insert(beat, rest)
-                        
-            else:  # Measure 3
-                # First beat: quarter note
-                found_note = None
-                for note_time, music_note in notes:
-                    if abs(note_time - 8.0) < 0.1:  # Beat 1 of measure 3
-                        found_note = music_note
-                        break
-                
-                if found_note:
-                    measure.insert(0, found_note)
-                else:
-                    rest = note.Rest(quarterLength=1.0)
-                    measure.insert(0, rest)
-                
-                # Beats 2-4: quarter rest + half rest
-                quarter_rest = note.Rest(quarterLength=1.0)
-                half_rest = note.Rest(quarterLength=2.0)
-                measure.insert(1, quarter_rest)
-                measure.insert(2, half_rest)
-            
-            part.append(measure)
+            notes_with_duration.append((onset_time, note_obj))
         
-        return part
+        return notes_with_duration
     
-    def transcribe_to_midi(self, audio_path, output_dir=None):
-        """Transcribe audio file using pattern-matching approach."""
+    
+    def transcribe_to_midi(self, audio_path):
+        """Transcribe audio file using generic onset detection and frequency analysis."""
         # Load audio
         audio, sr = librosa.load(audio_path, sr=self.sr, mono=True)
+        audio_duration = len(audio) / sr
         
-        # Use pattern-based detection
-        treble_template_notes, bass_template_notes = self._extract_known_pattern(audio, sr)
+        # Extract notes using generic method
+        treble_notes, bass_notes = self._extract_notes_from_audio(audio, sr)
         
-        # Convert to structured music21 notes with proper timing
-        treble_notes = self._create_expected_structure(treble_template_notes)
-        bass_notes = self._create_expected_structure(bass_template_notes)
+        print(f"Debug: Extracted {len(treble_notes)} treble notes, {len(bass_notes)} bass notes")
         
-        print(f"Debug: Structured {len(treble_notes)} treble notes, {len(bass_notes)} bass notes")
+        # Estimate note durations
+        treble_notes = self._estimate_note_durations(treble_notes)
+        bass_notes = self._estimate_note_durations(bass_notes)
+        
+        # Detect key signature from all notes
+        all_notes = treble_notes + bass_notes
+        detected_key = self._detect_key_signature(all_notes)
+        
+        print(f"Debug: Detected key signature: {detected_key}")
         
         # Create music21 score
         score = stream.Score()
         
         # Create treble clef part (right hand)
-        treble_part = self._create_structured_part(
+        treble_part = self._create_dynamic_part(
             treble_notes, 
             instrument.Piano(), 
             clef_obj=clef.TrebleClef(),
-            key_sig=key.KeySignature(0)
+            key_sig=detected_key,
+            audio_duration=audio_duration
         )
         
         # Create bass clef part (left hand) 
-        bass_part = self._create_structured_part(
+        bass_part = self._create_dynamic_part(
             bass_notes,
             instrument.Piano(),
             clef_obj=clef.BassClef(), 
-            key_sig=key.KeySignature(0)
+            key_sig=detected_key,
+            audio_duration=audio_duration
         )
         
         # Add both parts to score
@@ -578,7 +430,7 @@ class BrassArranger:
         
         return note_obj
     
-    def _suppress_key_signature_accidentals(self, note_obj, key_signature_sharps_flats):
+    def _suppress_key_signature_accidentals(self, note_obj, key_sig):
         """Remove visual accidentals that are already implied by the key signature."""
         if not (hasattr(note_obj.pitch, 'accidental') and note_obj.pitch.accidental):
             return
@@ -586,17 +438,20 @@ class BrassArranger:
         step = note_obj.pitch.step
         accidental_name = note_obj.pitch.accidental.name
         
-        # Check if this accidental is implied by the key signature
-        # D major (2 sharps) implies F# and C#
-        if key_signature_sharps_flats == 2:  # D major
-            if ((step == 'F' and accidental_name == 'sharp') or 
-                (step == 'C' and accidental_name == 'sharp')):
+        # Get the accidentals implied by the key signature
+        key_accidentals = key_sig.alteredPitches
+        
+        # Check if this note's accidental is implied by the key signature
+        for altered_pitch in key_accidentals:
+            if (step == altered_pitch.step and 
+                accidental_name == altered_pitch.accidental.name):
                 note_obj.pitch.accidental.displayStatus = False
+                break
     
     def _process_measure_elements(self, source_measure, target_measure, 
                                   transposition_interval=None, 
                                   min_range=None, max_range=None,
-                                  key_sig_accidentals=0):
+                                  key_sig=None):
         """Process notes and rests from source measure to target measure."""
         # Copy barlines (only final ones)
         for barline in source_measure.getElementsByClass(bar.Barline):
@@ -618,7 +473,8 @@ class BrassArranger:
                     new_note = self._transpose_note_to_range(new_note, min_range, max_range)
                 
                 # Handle key signature accidentals
-                self._suppress_key_signature_accidentals(new_note, key_sig_accidentals)
+                if key_sig:
+                    self._suppress_key_signature_accidentals(new_note, key_sig)
                 
                 target_measure.append(new_note)
             else:
@@ -641,13 +497,25 @@ class BrassArranger:
     
     def arrange_for_trumpet(self):
         """Arrange the treble part for Bb trumpet."""
-        # Set up trumpet part with D major key signature (for Bb instrument)
+        # Get original key signature from treble part
+        original_key = None
+        for element in self.treble_part.getElementsByClass(key.KeySignature):
+            original_key = element
+            break
+        
+        if original_key is None:
+            original_key = key.KeySignature(0)  # Default to C major
+        
+        # Transpose key signature for Bb trumpet
+        transposed_key = KeySignatures.transpose_key_signature(original_key, Transposition.BB_TRUMPET)
+        
+        # Set up trumpet part
         trumpet_part = self._setup_instrument_part(
             instrument.Trumpet(), 
-            key_sig=KeySignatures.D_MAJOR
+            key_sig=transposed_key
         )
         
-        # Copy time signatures (key signature already handled above)
+        # Copy time signatures
         for element in self.treble_part.getElementsByClass(meter.TimeSignature):
             trumpet_part.append(element)
         
@@ -661,7 +529,7 @@ class BrassArranger:
                 transposition_interval=Transposition.BB_TRUMPET,
                 min_range=Ranges.TRUMPET_MIN,
                 max_range=Ranges.TRUMPET_MAX,
-                key_sig_accidentals=2  # D major has 2 sharps
+                key_sig=transposed_key
             )
             
             trumpet_part.append(new_measure)
@@ -670,11 +538,20 @@ class BrassArranger:
     
     def arrange_for_trombone(self):
         """Arrange the bass part for trombone (concert pitch)."""
-        # Set up trombone part with bass clef and C major key signature
+        # Get original key signature from bass part
+        original_key = None
+        for element in self.bass_part.getElementsByClass(key.KeySignature):
+            original_key = element
+            break
+        
+        if original_key is None:
+            original_key = key.KeySignature(0)  # Default to C major
+        
+        # Trombone stays in concert pitch, so use original key
         trombone_part = self._setup_instrument_part(
             instrument.Trombone(),
             clef_obj=clef.BassClef(),
-            key_sig=KeySignatures.C_MAJOR
+            key_sig=original_key
         )
         
         # Copy time signatures
@@ -691,7 +568,7 @@ class BrassArranger:
                 transposition_interval=None,  # Concert pitch, no transposition
                 min_range=Ranges.TROMBONE_MIN,
                 max_range=Ranges.TROMBONE_MAX,
-                key_sig_accidentals=0  # C major has no sharps/flats
+                key_sig=original_key
             )
             
             trombone_part.append(new_measure)
