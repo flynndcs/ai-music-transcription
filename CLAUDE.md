@@ -18,6 +18,8 @@ Focus Areas: Music Processing, MusicXML, Algorithm Development
 
 Claude should be aware of:
 - **Primary Technology**: Python 3.8+ with music21 library
+- **Package Management**: uv (recommended) or pip for dependency management
+- **Project Structure**: Modern Python with pyproject.toml configuration
 - **Input Format**: MusicXML piano scores
 - **Output Format**: Transposed MusicXML brass arrangements
 - **Core Logic**: Instrument transposition, range adjustment, key signature handling
@@ -110,8 +112,9 @@ When working with Claude, provide context about:
 - `examples/Example.xml` - Test input file
 
 ### Configuration Files
-- `requirements.txt` - Python dependencies
-- `setup.py` - Package installation
+- `pyproject.toml` - Package configuration and dependencies (uv/modern)
+- `requirements.txt` - Python dependencies (legacy compatibility)
+- `.python-version` - Python version specification for uv
 - `README.md` - User documentation
 
 ### Development Files
@@ -132,6 +135,29 @@ When Claude makes changes, verify:
 - [ ] **No Regressions**: Existing functionality still works
 
 ### Test Commands
+
+#### With uv (Recommended)
+
+```bash
+# Test basic functionality
+cd examples
+uv run python -m transcriber.brass_arranger
+
+# Or activate the environment first
+uv shell
+python -m transcriber.brass_arranger
+
+# Check output files
+ls -la Example_*.xml
+
+# Verify MusicXML structure
+head -n 50 Example_Trumpet.xml
+
+# Run tests
+uv run pytest tests/
+```
+
+#### With pip (Traditional)
 
 ```bash
 # Test basic functionality

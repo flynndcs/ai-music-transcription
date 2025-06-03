@@ -1,14 +1,8 @@
+# This file is kept for compatibility but uv will use pyproject.toml dependencies
+# For uv usage: uv sync or uv sync --group dev
+
 # Core dependencies
 music21>=9.1.0
-
-# Audio processing dependencies
 librosa>=0.10.0
 soundfile>=0.12.0
 basic-pitch>=0.2.5
-
-# Development dependencies (install with: pip install -e ".[dev]")
-# pytest>=7.0.0
-# pytest-cov>=4.0.0
-# black>=23.0.0
-# flake8>=6.0.0
-# mypy>=1.0.0

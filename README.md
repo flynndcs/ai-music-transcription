@@ -16,6 +16,25 @@ A Python library for converting piano music to brass instrument arrangements. Th
 
 ### Installation
 
+#### Using uv (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/flynndcs/ai-music-transcription.git
+cd ai-music-transcription
+
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create virtual environment and install dependencies
+uv sync
+
+# For development with additional tools
+uv sync --group dev
+```
+
+#### Using pip (Traditional)
+
 ```bash
 # Clone the repository
 git clone https://github.com/flynndcs/ai-music-transcription.git
@@ -49,6 +68,20 @@ print(f"  - Brass Duet: {duet_file}")
 ```
 
 ### Command Line Usage
+
+#### With uv
+
+```bash
+# Run the example
+cd examples
+uv run python -m transcriber.brass_arranger
+
+# Or activate the environment first
+uv shell
+python -m transcriber.brass_arranger
+```
+
+#### With pip
 
 ```bash
 # Run the example
@@ -124,14 +157,30 @@ ai-music-transcription/
 │   └── generated/               # Generated output directory
 ├── tests/                        # Unit tests
 ├── docs/                        # Documentation
-├── requirements.txt             # Python dependencies
-├── setup.py                    # Package setup
+├── requirements.txt             # Python dependencies (legacy)
+├── pyproject.toml              # Package configuration (uv/modern)
+├── .python-version             # Python version for uv
 ├── README.md                   # This file
 ├── LICENSE                     # MIT license
 └── TODO.md                    # Future enhancements
 ```
 
 ### Running Tests
+
+#### With uv
+
+```bash
+# Install development dependencies
+uv sync --group dev
+
+# Run tests
+uv run pytest tests/
+
+# Run with coverage
+uv run pytest --cov=transcriber tests/
+```
+
+#### With pip
 
 ```bash
 # Install development dependencies

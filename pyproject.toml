@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-music-transcription"
+version = "0.1.0"
+description = "Tool for converting piano scores to brass arrangements"
+readme = "README.md"
+license = "MIT"
+authors = [
+    {name = "Transcriber Team", email = "contact@example.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Multimedia :: Sound/Audio :: Analysis",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "music21>=9.1.0",
+    "librosa>=0.10.0",
+    "soundfile>=0.12.0",
+    "basic-pitch>=0.2.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+transcriber = "transcriber.brass_arranger:main"
+
+[project.urls]
+Homepage = "https://github.com/flynndcs/ai-music-transcription"
+Repository = "https://github.com/flynndcs/ai-music-transcription"
+Issues = "https://github.com/flynndcs/ai-music-transcription/issues"
+Documentation = "https://github.com/flynndcs/ai-music-transcription/docs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/transcriber"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/README.md",
+    "/LICENSE",
+]
